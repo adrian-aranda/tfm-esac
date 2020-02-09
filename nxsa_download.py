@@ -131,16 +131,18 @@ def download_source_lists(obsid, odf_dir):
 
 def cifbuild(odf_dir):
     os.chdir(odf_dir)
-    if not os.path.isfile("ccf.cif"):
+    cif_file = "{}/ccf.cif".format(odf_dir)
+    if not os.path.isfile(cif_file):
         status = exec_task("cifbuild")
         if (status != 0):
             raise Exception
-        cif_file = "{}/ccf.cif".format(odf_dir)
         print("{} generated correctly.".format(cif_file))
         os.environ['SAS_CCF'] = cif_file
         print("SAS_CCF={}".format(cif_file))
     else:
         print("cif.ccf already exists.")
+        os.environ['SAS_CCF'] = cif_file
+        print("SAS_CCF={}".format(cif_file))
 
 
 def odfingest(odf_dir):
@@ -150,7 +152,7 @@ def odfingest(odf_dir):
         status = exec_task("odfingest")
         if (status != 0):
             print(f"Task odfingest failed")
-            raise Exception
+            #raise Exception
         SUM_SAS_file = glob.glob("*SUM.SAS")[0]
         os.environ['SAS_ODF'] = SUM_SAS_file
         print("SAS_ODF={}".format(SUM_SAS_file))

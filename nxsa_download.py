@@ -28,7 +28,7 @@ def build_dir(odf_dir):
 def download_odf(obsid, odf_dir):
     os.chdir(odf_dir)
     manifest = glob.glob("MANIFEST*")  # Check if manifest exist, that is, odf was extracted.
-    if len(manifest) == 0:
+    if len(manifest) == 0 or len(glob.glob("*.ASC")) == 0:
         nxsa_url = 'http://nxsa.esac.esa.int/nxsa-sl/servlet/data-action-aio?obsno={}&level=ODF'.format(obsid)
         odf_tarfile = '{}/{}_odf.tar'.format(odf_dir, obsid)
         print('Downloading ODF for {} from NXSA...'.format(obsid))
@@ -148,16 +148,27 @@ def cifbuild(odf_dir):
 def odfingest(odf_dir):
     os.chdir(odf_dir)
     SUM_SAS_file = glob.glob("*SUM.SAS")
-    if len(SUM_SAS_file) == 0:
-        status = exec_task("odfingest")
-        if (status != 0):
-            print(f"Task odfingest failed")
-            #raise Exception
-        SUM_SAS_file = glob.glob("*SUM.SAS")[0]
-        os.environ['SAS_ODF'] = SUM_SAS_file
-        print("SAS_ODF={}".format(SUM_SAS_file))
-    else:
-        print("*SUM.SAS file already exists.")
+    if len(SUM_SAS_file) != 0:
+        for sum_sas in SUM_SAS_file:
+            os.remove(sum_sas)
+    status = exec_task("odfingest")
+    if (status != 0):
+        print(f"Task odfingest failed")
+        raise Exception
+    SUM_SAS_file = glob.glob("*SUM.SAS")[0]
+    os.environ['SAS_ODF'] = SUM_SAS_file
+    print("SAS_ODF={}".format(SUM_SAS_file))
+
+    # if len(SUM_SAS_file) == 0:
+    #     status = exec_task("odfingest")
+    #     if (status != 0):
+    #         print(f"Task odfingest failed")
+    #         #raise Exception
+    #     SUM_SAS_file = glob.glob("*SUM.SAS")[0]
+    #     os.environ['SAS_ODF'] = SUM_SAS_file
+    #     print("SAS_ODF={}".format(SUM_SAS_file))
+    # else:
+    #     print("*SUM.SAS file already exists.")
 
 
 if __name__ == '__main__':
@@ -173,8 +184,9 @@ if __name__ == '__main__':
 
     wdir = "/home/aaranda/tfm/obsid"
 
+    error_list = ['0094380601', '0099280201', '0158970101', '0304203401', '0122520201', '0112550801', '0152900201', '0009220901', '0111220201', '0123100101', '0123100201', '0002740501', '0100240101', '0100240201', '0039340101', '0100240901', '0100241001']
     error_obsid = []
-    for obsid in obsid_list:
+    for obsid in error_list:
         try:
             odf_dir = "{}/{}".format(wdir, obsid)
             build_dir(odf_dir)

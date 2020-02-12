@@ -129,6 +129,46 @@ def download_source_lists(obsid, odf_dir):
         print("Sources list already downloaded in {}/pps".format(odf_dir))
 
 
+def download_error_srclist(obsid, odf_dir):
+    os.chdir(odf_dir)
+    pps_files = glob.glob("pps/*.fits")
+    error_tarfile = glob.glob("*.tar")
+    for tar in error_tarfile:
+        os.remove(tar)
+
+    if len(pps_files) == 0 or all("OBSMLI" not in s for s in pps_files):
+
+        nxsa_url = 'https://nxsa.esac.esa.int/nxsa-sl/servlet/data-action-aio?obsno={}&extension=FTZ&level=PPS'.format(obsid)
+        pps_tarfile = '{}/{}_full.tar'.format(odf_dir, obsid)
+        print(f'Downloading PPS products for {obsid} from NXSA...')
+        r = requests.get(nxsa_url)
+        with open(pps_tarfile, "wb") as tmp:
+            tmp.write(r.content)
+        print('.TAR file saved to {}'.format(pps_tarfile))
+
+        pps_dir = '{}/pps'.format(odf_dir)
+        os.chdir(pps_dir)
+        pattern1 = "EPX"
+        pattern2 = "OBSMLI"
+        with tarfile.open(pps_tarfile, 'r') as tar:
+            for member in tar.getmembers():
+                if pattern1 in member.name:
+                    if pattern2 in member.name:
+                        f = tar.extract(member, path=wdir)
+                        name = member.name.split('/')[2]  # obsid/tmp/file.tar
+                        rename = name.split('.')[0] + '.fits.gz'
+                        os.rename(name, rename)
+                        with gzip.open(rename, 'rb') as f_in:
+                            with open(rename.split('.gz')[0], 'wb') as f_out:
+                                shutil.copyfileobj(f_in, f_out)
+                        print('Extracted {} in {}'.format(rename.split('.gz')[0], wdir))
+        os.remove(rename)
+        os.chdir(odf_dir)
+        os.remove(pps_tarfile)
+    else:
+        print("Sources list already downloaded in {}/pps".format(odf_dir))
+
+
 def cifbuild(odf_dir):
     os.chdir(odf_dir)
     cif_file = "{}/ccf.cif".format(odf_dir)
@@ -191,9 +231,11 @@ if __name__ == '__main__':
             odf_dir = "{}/{}".format(wdir, obsid)
             build_dir(odf_dir)
 
-            download_odf(obsid, odf_dir)
-            download_pps(obsid, odf_dir)
-            download_source_lists(obsid, odf_dir)
+            download_error_srclist(obsid, odf_dir)
+
+            # download_odf(obsid, odf_dir)
+            # download_pps(obsid, odf_dir)
+            # download_source_lists(obsid, odf_dir)
 
             cifbuild(odf_dir)
             odfingest(odf_dir)

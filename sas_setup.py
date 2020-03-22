@@ -1,9 +1,11 @@
+import logging
 import os
 import subprocess
 import sys
+from astropy.io import fits
 
-
-def sasinit(sas_dir):
+def sasinit():
+    sas_dir = "/home/aaranda/SAS/sas_18.0.0-Ubuntu16.04-64/xmmsas_20190531_1155"
     os.environ["SAS_DIR"] = sas_dir
     os.environ["SAS_PATH"] = os.environ["SAS_DIR"]
     os.environ["SAS_VERBOSITY"] = "4"
@@ -16,6 +18,7 @@ def sasinit(sas_dir):
     lib_path = f"{sas_dir}/lib:{sas_dir}/libextra:{sas_dir}"
     os.environ["LD_LIBRARY_PATH"] = lib_path
     os.environ["PERL5LIB"] = "{}/lib/perl5".format(sas_dir)
+    os.environ['SAS_CCFPATH'] = "/home/aaranda/SAS/sas_18.0.0-Ubuntu16.04-64/xmmsas_20190531_1155/calibration"
     # sasversion
     # perl -e "print qq(@INC)"
 
@@ -36,3 +39,30 @@ def exec_task(task, verbose=True):
     except OSError as e:
         print(f"Execution of {task} failed:", e, file=sys.stderr)
     return retcode
+
+
+def get_catalog():
+    bll_catalog = fits.open('/home/aaranda/tfm/bllacs_PN_NopileupNofasttiming.fits')
+    data = bll_catalog[1].data
+    obsid_list = []
+    for row in data:
+        obsid_list.append(row[5])
+    return obsid_list
+
+def my_custom_logger(logger_name, level=logging.INFO):
+    """
+    Method to return a custom logger with the given name and level
+    """
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(level)
+    format_string = '%(asctime)s - %(message)s'
+    log_format = logging.Formatter(format_string)
+    # # Creating and adding the console handler
+    # console_handler = logging.StreamHandler(sys.stdout)
+    # console_handler.setFormatter(log_format)
+    # logger.addHandler(console_handler)
+    # Creating and adding the file handler
+    file_handler = logging.FileHandler(logger_name, mode='a')
+    file_handler.setFormatter(log_format)
+    logger.addHandler(file_handler)
+    return logger

@@ -5,6 +5,7 @@ import os
 from sas_setup import exec_task
 from sas_setup import sasinit
 from sas_setup import get_catalog
+from sas_setup import my_custom_logger
 
 import glob
 
@@ -35,13 +36,13 @@ def radial_prof_psf(eq_coords, logfile):
     log.close()
 
 def detmask(odf_dir, pi):
-    logging.info("TASK: atthkgen")
+    logger.info("TASK: atthkgen")
     task = "atthkgen"
     status = exec_task(task)
     if (status != 0):
         raise Exception
-    logging.info("atthkegn generated correctly.")
-    logging.info("TASK: atthkgen")
+    logger.info("atthkegn generated correctly.")
+    logger.info("TASK: atthkgen")
     image_low = "{}/images/image_filtered_low.fits".format(odf_dir)
     image_high = "{}/images/image_filtered_high.fits".format(odf_dir)
     atthk = glob.glob("atthk.dat")[0]
@@ -58,7 +59,7 @@ def detmask(odf_dir, pi):
     status = exec_task(task)
     if (status != 0):
         raise Exception
-    logging.info("expfiles generated correctly.")
+    logger.info("expfiles generated correctly.")
 
     detfile_low = "detfile_low.fits"
     detfile_high = "detfile_high.fits"
@@ -67,15 +68,16 @@ def detmask(odf_dir, pi):
     status = exec_task(task)
     if (status != 0):
         raise Exception
-    task = f"emask expimageset={expfile_high} detmaskset={detfile_high} threshold1=0.3 threshold2=0.5 withregionset=true regionset=bkg_region_clean.ds"
+    task = f"emask expimageset={expfile_high} detmaskset={detfile_high} threshold1=0.0 threshold2=0.3 withregionset=true regionset=bkg_region_clean.ds"
     status = exec_task(task)
+
     if (status != 0):
         raise Exception
     # task = f"emask expimageset=psf.fits detmaskset={detfile_high} regionset='bkg_region_clean.ds' threshold1=0.3 threshold2=0.5"
     # status = exec_task(task)
     # if (status != 0):
     #     raise Exception
-    logging.info("detfiles generated correctly.")
+    logger.info("detfiles generated correctly.")
 
 def psf_gen(coords):
     images_dir = ""
@@ -107,21 +109,21 @@ if __name__ == '__main__':
 
     error_obsid = []
 
-    obsid_list = ["0692840501", "0165770201", "0600920201", "0551750301", "0727770901",
-            "0310190101", "0094383101", "0804272801", "0673000136", "0041180801"]
+    #obsid_list = ["0692840501", "0165770201", "0600920201", "0551750301", "0727770901", "0310190101", "0094383101", "0804272801", "0673000136", "0041180801"]
 
     count = 1
     for obsid in obsid_list:
-        # try:
+        try:
 
             print("Executing {} of {}...".format(count, len(obsid_list)))
             count += 1
             odf_dir = "{}/{}".format(wdir, obsid)
 
             logfile = "{}/logs/phot_{}.log".format(odf_dir, datetime.today().strftime('%Y%m%d-%H:%M'))
-            logging.basicConfig(filename=logfile, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s')
-            logging.info("OBSID: {} DATETIME: {}".format(obsid, datetime.today().strftime('%Y/%m/%d %H:%M')))
-            logging.info("SAS_ODF={}".format(odf_dir))
+            logger = my_custom_logger(logfile)
+            #logging.basicConfig(filename=logfile, filemode='w', level=logging.INFO, format='%(asctime)s - %(message)s')
+            logger.info("OBSID: {} DATETIME: {}".format(obsid, datetime.today().strftime('%Y/%m/%d %H:%M')))
+            logger.info("SAS_ODF={}".format(odf_dir))
 
             os.chdir(odf_dir)
             cif_file = "{}/ccf.cif".format(odf_dir)
@@ -137,9 +139,9 @@ if __name__ == '__main__':
             # cal_view()
 
 
-        # except:
-        #     error_obsid.append(obsid)
-        #     print("Error ocurred with obsid: {}".format(obsid))
-        #     pass
+        except:
+            error_obsid.append(obsid)
+            print("Error ocurred with obsid: {}".format(obsid))
+            pass
 
     print(error_obsid)

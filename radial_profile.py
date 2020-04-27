@@ -1,6 +1,7 @@
 import glob
 import os
 import logging
+import shutil
 
 import numpy as np
 
@@ -11,6 +12,7 @@ from sas_setup import my_custom_logger
 
 from astropy.io import fits
 from datetime import datetime
+
 
 def edetect_chain(odf_dir, pi):
     logger.info("TASK: edetect_chain")
@@ -188,14 +190,14 @@ def radial_prof(eq_coords, odf_dir):
     logger.info("CIRCLE: {}".format(circle))
     # ------------------------------------------------------------------
 
-    task = f"eradial imageset={image_low} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=1.0 centroid='yes' binwidth=6.0"
+    task = f"eradial imageset={image_low} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=1.0 centroid='yes' binwidth=1.0"
     logger.info("COMMAND: {}".format(task))
     status = exec_task(task)
     if (status != 0):
         raise Exception
     os.rename("radprof.ds", f"radprof_low.ds")
 
-    task = f"eradial imageset={image_high} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=5.0 centroid='yes' binwidth=6.0"  # binwidth = 4.0 or 6.0
+    task = f"eradial imageset={image_high} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=5.0 centroid='yes' binwidth=1.0"  # binwidth = 4.0 or 6.0
     logger.info("COMMAND: {}".format(task))
     status = exec_task(task)
     if (status != 0):
@@ -219,9 +221,9 @@ if __name__ == '__main__':
 
     error_obsid = []
 
-    obsid_list = ["0692840501", "0165770201", "0600920201", "0551750301", "0727770901",
-            "0310190101", "0094383101", "0804272801", "0673000136", "0041180801"]
+    #obsid_list = ["0692840501", "0165770201", "0600920201", "0551750301", "0727770901", "0310190101", "0094383101", "0804272801", "0673000136", "0041180801"]
 
+    obsid_list = ["0651360401"]
     count = 1
     for obsid in obsid_list:
         try:
@@ -229,7 +231,6 @@ if __name__ == '__main__':
             print("Executing {} of {}...".format(count, len(obsid_list)))
             count += 1
             odf_dir = "{}/{}".format(wdir, obsid)
-
 
 
             logfile = "{}/logs/rad_prof_{}.log".format(odf_dir, datetime.today().strftime('%Y%m%d-%H:%M'))
@@ -243,7 +244,6 @@ if __name__ == '__main__':
             os.environ['SAS_CCF'] = cif_file
             SUM_SAS_file = glob.glob("*SUM.SAS")[0]
             os.environ['SAS_ODF'] = SUM_SAS_file
-
 
             # edetect_chain(odf_dir, images_dir, pi, logfile)
 

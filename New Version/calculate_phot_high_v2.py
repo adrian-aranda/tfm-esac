@@ -18,9 +18,8 @@ from regions import CircleSkyRegion
 import matplotlib.pylab as plt
 from matplotlib.patches import Circle
 
-from sas_setup import exec_task
-from sas_setup import sasinit
-from sas_setup import get_catalog
+from commons import exec_task
+from commons import sasinit
 
 def get_coords(odf_dir):
     logs_list = glob.glob("{}/logs/rad_prof*".format(odf_dir))
@@ -83,6 +82,7 @@ def calc_radial_profile(fitsfile, center, rstart, rend, rstep, verbose=False, de
     counts_err = []
     rmid = []
     #
+    emtpy = False
     while rx < r_end:
         r0 = rstart + rstep * j
         rx = rstart + rstep * (j + 1)
@@ -108,8 +108,13 @@ def calc_radial_profile(fitsfile, center, rstart, rend, rstep, verbose=False, de
             print(
                 f"Annulus: {r0:.2f},{rx:.2f},geometric area: {ap_area:.1f} pixels,non-masked area {good_area:.1f} pixels, ratio: {ap_area / good_area:.2f}")
         # taking into account the masked pixels
-        counts.append(photo['aperture_sum'][0] / good_area)
-        counts_err.append(np.sqrt(photo['aperture_sum'][0]) / good_area)
+        if (good_area == 0.0):
+            counts.append(float('nan'))
+            counts_err.append(float('nan'))
+        else:
+            counts.append(photo['aperture_sum'][0] / good_area)
+            counts_err.append(np.sqrt(photo['aperture_sum'][0]) / good_area)
+
         j += 1
     #
     # convert the results in numpy arrays
@@ -132,9 +137,6 @@ def calc_radial_profile(fitsfile, center, rstart, rend, rstep, verbose=False, de
         ax.set_ylabel(r'Counts/arcsec$^2$')
         ax.grid()
         ax.set_title(f"Radial profile");
-        plt.savefig('/home/aaranda/tfm/psf_gen/{}_radprof_low.png'.format(obsid))
-        plt.close(fig)
-
     qhdu.close()
     if (doMask):
         det.close()
@@ -177,8 +179,7 @@ if __name__ == '__main__':
 
     error_obsid = []
     count = 1
-
-    obsid_list = ['0650380201']
+    #obsid_list = ['0830190501']
     for obsid in obsid_list:
 
         try:
@@ -204,11 +205,17 @@ if __name__ == '__main__':
             r_end = 4.0 * u.arcmin
             r_step = 6.0 * u.arcsec
 
-            detmask_file = '{}/detfile_low.fits'.format(odf_dir)
+            detmask_file = '{}/detfile_high.fits'.format(odf_dir)
             det = fits.open(detmask_file)
             detmask = det['MASK']
             wcs_det = WCS(detmask.header)
-            fits_image = '{}/images/image_filtered_low.fits'.format(odf_dir)
+
+            fits_image = '{}/images/image_filtered_high.fits'.format(odf_dir)
+            # if not os.path.isfile('{}/images/image_filtered_high_clean.fits'.format(odf_dir)):
+            #     fits_image = '{}/images/image_filtered_high.fits'.format(odf_dir)
+            # else:
+            #     fits_image = '{}/images/image_filtered_high_clean.fits'.format(odf_dir)
+
             hdu = fits.open(fits_image)
             wcs = WCS(hdu[0].header)
             g2_kernel = Gaussian2DKernel(2)
@@ -233,14 +240,14 @@ if __name__ == '__main__':
             circle_sky = CircleSkyRegion(center=center, radius=r_end)
             pix_reg = circle_sky.to_pixel(wcs)
             pix_reg.plot(ax=ax, edgecolor='yellow')
-            plt.savefig('/home/aaranda/tfm/results/{}/{}/smoothed_g2_image_low.png'.format(target, obsid))
+            plt.savefig('/home/aaranda/tfm/results_v2/{}/{}/smoothed_g2_image_high.png'.format(target, obsid))
             plt.close(fig)
 
 
             (x, y, yerr) = calc_radial_profile(fits_image, center, r_start, r_end, r_step, verbose=False,
                                                detmaskfile=detmask_file, plot=False)
 
-            energy = 1000  # at 1 keV
+            energy = 5000  # at 5 keV
             box = 2 * int(r_end.to(u.arcsec).value) + 1
             psf_out = '{}/psf_ellbeta_{}_{}pix.fits'.format(odf_dir, energy, box)
             psf_gen(center, energy, box, psf_out)
@@ -262,35 +269,45 @@ if __name__ == '__main__':
             ax.ylabel = 'Dec'
             ax.set_xlabel('RA')
             ax.set_ylabel('DEC')
-            plt.savefig('/home/aaranda/tfm/results/{}/{}/theorical_psf_low.png'.format(target, obsid))
+            plt.savefig('/home/aaranda/tfm/results_v2/{}/{}/theorical_psf_high.png'.format(target, obsid))
             plt.close(fig)
 
             (psf_mid, psf_counts, psf_counts_err) = \
                 calc_radial_profile(psf_out, center, r_start, r_end, r_step, verbose=False, detmaskfile=None, plot=False)
 
-            norm_counts = y / y[1]
-            norm_counts_err = yerr / y[1]
+            #
+            # normalise the source
+            #
+            jnorm = next((i for i, yy in enumerate(y) if (yy > 0.0)), None)
+            #
+            if (jnorm > 0):
+                print("Warning: the central radial bin is masked (zero area) or has zero counts.")
+                print(
+                    f"The first non-zero radial bin is with index {jnorm}, bin start at {r_start + r_step * jnorm} arcsec")
+            norm_counts = y / y[jnorm]
+            norm_counts_err = yerr / y[jnorm]
             back = np.mean(norm_counts[-3:])  # the mean of the last 3 radial points
             #
             # and normalise the PSF
             #
-            norm_psf_counts = psf_counts / psf_counts[1]
+            norm_psf_counts = psf_counts / psf_counts[jnorm]
+            #
 
             fig, ax = plt.subplots(figsize=(10, 8))
             # ax.errorbar(rmid,counts,xerr=r_step.value/2.0,yerr=counts_err)
             # ax.errorbar(rmid,counts_arcsec2,xerr=r_step.value/2.0,yerr=counts_err_arcsec2,label='Source')
             ax.errorbar(x, norm_counts, xerr=r_step.value / 2.0, yerr=norm_counts_err, label='Fuente')
-            ax.plot(psf_mid, norm_psf_counts, label=f'PSF a {energy / 1000:.2f} keV')
+            # ax.plot(psf_mid,norm_psf_counts,label=f'PSF at {energy/1000:.2f} keV')
             ax.plot(psf_mid, norm_psf_counts + back, label='PSF + background', color='red')
             ax.axhline(back, color='gray', linestyle="--", label='Background')
             ax.set_xscale('linear')
             ax.set_yscale('log')
-            ax.set_xlabel('Radio (arcsec)')
-            ax.set_ylabel(r'cuentas/arcsec$^2$')
+            ax.set_xlabel('Radial distance (arcsec)')
+            ax.set_ylabel(r'Normalised counts/arcsec$^2$')
             ax.grid()
             #ax.set_title(f"Radial profile taking into account the bad pixels and CCD chip gaps")
-            ax.legend()
-            plt.savefig('/home/aaranda/tfm/results/{}/{}/radial_profile_low.png'.format(target, obsid))
+            ax.legend();
+            plt.savefig('/home/aaranda/tfm/results_v2/{}/{}/radial_profile_high.png'.format(target, obsid))
             plt.close(fig)
         except:
             error_obsid.append(obsid)

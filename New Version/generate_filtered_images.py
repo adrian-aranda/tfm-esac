@@ -5,10 +5,10 @@ import shutil
 
 import numpy as np
 
-from sas_setup import exec_task
-from sas_setup import sasinit
-from sas_setup import get_catalog
-from sas_setup import my_custom_logger
+from commons import exec_task
+from commons import sasinit
+from commons import get_catalog
+from commons import my_custom_logger
 
 from astropy.io import fits
 from datetime import datetime
@@ -19,9 +19,14 @@ def edetect_chain(odf_dir, pi):
     images_dir = odf_dir + "/images"
     os.chdir(images_dir)
     logger.info("Using:")
-    image_low = glob.glob("*_500_2000.fits")[0]
+    #image_low = glob.glob("*_500_2000.fits")[0]
+    image_low = glob.glob("*_500_2000_clean.fits")[0]
     logger.info("{}".format(image_low))
-    image_high = glob.glob("*_4500_10000.fits")[0]
+    #image_high = glob.glob("*_4500_10000.fits")[0]
+    image_high = glob.glob("*_4500_10000_clean.fits")[0]
+    logger.info("{}".format(image_high))
+    #image_mid = glob.glob("*_2000_4500.fits")[0]
+    image_mid = glob.glob("*_2000_4500_clean.fits")[0]
     logger.info("{}".format(image_high))
     clean_evts = glob.glob("{}/clean_*".format(odf_dir))[0]
     logger.info("{}".format(clean_evts))
@@ -43,6 +48,14 @@ def edetect_chain(odf_dir, pi):
     status = exec_task(task)
     if (status != 0):
         logger.info("ERROR: Task edetect_chain failed. Check {}/tmp.log for more information".format(odf_dir))
+        raise Exception
+    task = f"edetect_chain imagesets={image_mid} eventsets={clean_evts} " + \
+           f"attitudeset={attitude_file} pimin={pi[1]} pimax={pi[2]} ecf={ecf} " + \
+           "eboxl_list='pn_eboxlist_l_low.fits' eboxm_list='pn_eboxlist_m_low.fits' " + \
+           "esp_nsplinenodes=16 eml_list='pn_emllist_low.fits' esen_mlmin=15 -V 5"
+    status = exec_task(task)
+    if (status != 0):
+        print(f"Task \"{task}\" failed")
         raise Exception
     logger.info("Sources detected correctly.")
 
@@ -152,6 +165,7 @@ def generate_filtered_images(odf_dir, bin_size, pi):
     os.chdir(images_dir)
     filtered = glob.glob("{}/filtered_*".format(odf_dir))[0]
     expr_high = f'PI in [{pi[2]}:{pi[3]}] &&  FLAG==0 && PATTERN in [0:4]'
+    expr_mid = f'PI in [{pi[1]}:{pi[2]}] &&  FLAG==0 && PATTERN in [0:4]'
     expr_low = f'PI in [{pi[0]}:{pi[1]}] &&  FLAG==0 && PATTERN in [0:4]'
 
     task = f'evselect table={filtered} xcolumn=X ycolumn=Y imagebinning=binSize' + \
@@ -171,39 +185,17 @@ def generate_filtered_images(odf_dir, bin_size, pi):
     status = exec_task(task)
     if (status != 0):
         raise Exception
+
+    task = f'evselect table={filtered} xcolumn=X ycolumn=Y imagebinning=binSize' + \
+           f' ximagebinsize={bin_size} yimagebinsize={bin_size}' + \
+           f' expression=\'{expr_mid}\'' + \
+           f' withimageset=true imageset=image_filtered_mid.fits'
+    logger.info("COMMAND: {}".format(task))
+    status = exec_task(task)
+    if (status != 0):
+        raise Exception
     os.chdir(odf_dir)
     logger.info("Images generated correctly.")
-
-
-def radial_prof(eq_coords, odf_dir):
-    logger.info("TASK: eradial")
-    images_dir = odf_dir + "/images"
-    image_low = glob.glob("{}/image_filtered_low*".format(images_dir))[0]
-    image_high = glob.glob("{}/image_filtered_high*".format(images_dir))[0]
-
-    # Find circle values on ds9:
-    # !!! No coger valores de radio inferiores a 400
-    # ------------------------------------------------------------------
-
-    r = 2.0 / 60.
-    circle = "{},{},{}".format(eq_coords[0], eq_coords[1], r)
-    logger.info("CIRCLE: {}".format(circle))
-    # ------------------------------------------------------------------
-
-    task = f"eradial imageset={image_low} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=1.0 centroid='yes' binwidth=1.0"
-    logger.info("COMMAND: {}".format(task))
-    status = exec_task(task)
-    if (status != 0):
-        raise Exception
-    os.rename("radprof.ds", f"radprof_low.ds")
-
-    task = f"eradial imageset={image_high} srcexp='(RA,DEC) in CIRCLE({circle})' psfenergy=5.0 centroid='yes' binwidth=1.0"  # binwidth = 4.0 or 6.0
-    logger.info("COMMAND: {}".format(task))
-    status = exec_task(task)
-    if (status != 0):
-        raise Exception
-    os.rename("radprof.ds", f"radprof_high.ds")
-    logger.info("Radial profiles generated correctly.")
 
 
 if __name__ == '__main__':
@@ -211,8 +203,23 @@ if __name__ == '__main__':
     # Initialize SAS
     sasinit()
 
-    # Get catalog obsid list
-    obsid_list = get_catalog()
+    # obsid_list = ['0142270101', '0300480201', '0300480301', '0401060201', '0502630201', '0679380701', '0761500201',
+    #               '0651360401', '0800732801', '0762870401', '0122520201', '0674330201', '0653040101', '0744412401',
+    #               '0783881001', '0302580401', '0502430201', '0502430701', '0693010401', '0106060601', '0112550801',
+    #               '0112551101', '0721890101', '0148250201', '0300140101', '0149880101', '0303930101', '0650380201',
+    #               '0693741001', '0153170101', '0084140101', '0084140501', '0655343842', '0002970201', '0604210201',
+    #               '0604210301', '0151490101', '0785110401', '0152900201', '0740820401', '0123100101', '0123100201',
+    #               '0670040101', '0761112401', '0803240801', '0830190501', '0303820301', '0783520201', '0652810201',
+    #               '0152460301', '0305750601', '0551750301', '0600920201', '0112830201', '0112830501', '0104860501',
+    #               '0124900101', '0692510101', '0604830201', '0100240101', '0100240201', '0804272701', '0722140101',
+    #               '0722140401', '0800270601', '0790380501', '0790380601', '0790380801', '0790381401', '0790381501',
+    #               '0790380901', '0761100101', '0761100201', '0761100301', '0761100401', '0761101001', '0744640101',
+    #               '0553561101', '0655346840', '0673000136', '0405380701', '0782350501']
+    # Con Out of time events
+    obsid_list = ['0721890101', '0084140101', '0084140501', '0604210201', '0604210301', '0152900201', '0123100201',
+                  '0830190501', '0303820301', '0112830201', '0112830501', '0104860501', '0124900101', '0790380501',
+                  '0790380601', '0790380801', '0790381401', '0790381501', '0790380901', '0761100101', '0761100201',
+                  '0761100301', '0761100401', '0761101001']
 
     wdir = "/home/aaranda/tfm/obsid"
 
@@ -221,9 +228,7 @@ if __name__ == '__main__':
 
     error_obsid = []
 
-    #obsid_list = ["0692840501", "0165770201", "0600920201", "0551750301", "0727770901", "0310190101", "0094383101", "0804272801", "0673000136", "0041180801"]
 
-    obsid_list = ["0002970201"]
     count = 1
     for obsid in obsid_list:
         try:
@@ -255,9 +260,6 @@ if __name__ == '__main__':
             filtered_region()
             print("Running step 4: evselect")
             generate_filtered_images(odf_dir, bin_size, pi)
-            print("Running step 5: eradial")
-            radial_prof(coords, odf_dir)
-
 
         except:
             error_obsid.append(obsid)

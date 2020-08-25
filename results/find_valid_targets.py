@@ -18,7 +18,7 @@ def get_catalog_coords(obsid):
 
 
 def build_dir(target, obsid):
-    results_dir = "/home/aaranda/tfm/results"
+    results_dir = "/home/aaranda/tfm/results_v2"
     target_dir = results_dir + "/" + target
     obsid_dir = target_dir + "/" + obsid
     if (not os.path.isdir(target_dir)):

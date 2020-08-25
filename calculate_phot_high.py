@@ -178,7 +178,7 @@ if __name__ == '__main__':
     error_obsid = []
     count = 1
 
-    #obsid_list = ['0604210201']
+    obsid_list = ['0722140401']
     for obsid in obsid_list:
 
         try:
@@ -267,13 +267,13 @@ if __name__ == '__main__':
             (psf_mid, psf_counts, psf_counts_err) = \
                 calc_radial_profile(psf_out, center, r_start, r_end, r_step, verbose=False, detmaskfile=None, plot=False)
 
-            norm_counts = y / y[0]
-            norm_counts_err = yerr / y[0]
+            norm_counts = y / y[1]
+            norm_counts_err = yerr / y[1]
             back = np.mean(norm_counts[-3:])  # the mean of the last 3 radial points
             #
             # and normalise the PSF
             #
-            norm_psf_counts = psf_counts / psf_counts[0]
+            norm_psf_counts = psf_counts / psf_counts[1]
 
             fig, ax = plt.subplots(figsize=(10, 8))
             # ax.errorbar(rmid,counts,xerr=r_step.value/2.0,yerr=counts_err)
